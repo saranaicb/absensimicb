@@ -1,0 +1,33 @@
+function doPost(e) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var data = JSON.parse(e.postData.contents);
+    
+    var nama = data.nama;
+    var tipe = data.tipe;
+    var tanggal = data.tanggal;
+    var jam = data.jam;
+    var fotoUrl = data.foto; // URL langsung dari ImgBB
+    var keterangan = data.keterangan;
+    
+    // Tambahkan Baris Baru ke Spreadsheet
+    sheet.appendRow([tanggal, jam, nama, tipe, fotoUrl, keterangan]);
+    
+    // Urutkan Otomatis Berdasarkan Tanggal (Kolom 1) dan Jam (Kolom 2)
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 2) {
+      var range = sheet.getRange(2, 1, lastRow - 1, 6);
+      range.sort([
+        {column: 1, ascending: true},
+        {column: 2, ascending: true}
+      ]);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ "result": "success", "message": "Absensi berhasil disimpan!" }))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ "result": "error", "error": error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
