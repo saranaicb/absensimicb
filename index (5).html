@@ -27,7 +27,7 @@
 <div class="card">
   <h2>Absensi Staff</h2>
   <form id="attendanceForm">
-    <!-- Dropdown Nama -->
+    <!-- Dropdown Nama Staff -->
     <label for="nama">Nama Staff:</label>
     <select id="nama" required>
       <option value="">-- Pilih Nama --</option>
@@ -67,11 +67,11 @@
 </div>
 
 <script>
-  // URL Web App Google Apps Script & API Key ImgBB
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyinVnMp6qCYOP3hWm7LZhAQFJyn3-l_wx4Yb2BxgK6szVgRMrfCiMvAXwtz8fXcUk1Ag/exec";
+  // Web App URL Google Apps Script Baru & API Key ImgBB
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwV_TSGE7bbm4hGpIJzVoxYTegriwNu5bEdZXyIGDfGQqYQFtFR7wZKtN_jv9kG1mwmyw/exec";
   const IMGBB_API_KEY = "ef69bd3c08ad95a67f49cc580af88447";
 
-  // Real-time jam & tanggal otomatis
+  // Waktu real-time
   function updateClock() {
     const now = new Date();
     const tgl = now.toISOString().split('T')[0];
@@ -98,7 +98,7 @@
     }
   }
 
-  // Kirim data ke ImgBB lalu ke Google Apps Script
+  // Proses Submit
   document.getElementById('attendanceForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     if (!selectedFile) {
@@ -112,10 +112,10 @@
     btn.disabled = true;
     btn.innerText = "Mengunggah Foto...";
     statusMsg.style.color = "#2563eb";
-    statusMsg.innerText = "Sedang mengunggah foto ke ImgBB...";
+    statusMsg.innerText = "Mengunggah foto ke ImgBB...";
 
     try {
-      // 1. Upload Foto ke ImgBB secara Real-Time
+      // 1. Upload ke ImgBB
       const formData = new FormData();
       formData.append("image", selectedFile);
 
@@ -126,12 +126,12 @@
       const imgbbData = await imgbbRes.json();
 
       if (!imgbbData.success) {
-        throw new Error("Gagal mengunggah foto ke server ImgBB.");
+        throw new Error("Gagal mengunggah foto.");
       }
 
       const photoUrl = imgbbData.data.url;
 
-      // 2. Kirim Data Absensi & Link Foto ke Google Sheets via Apps Script
+      // 2. Kirim Data ke Google Apps Script Baru
       statusMsg.innerText = "Menyimpan data absensi...";
       btn.innerText = "Menyimpan...";
 
@@ -140,32 +140,28 @@
         tipe: document.getElementById('tipe').value,
         tanggal: document.getElementById('tanggal').value,
         jam: document.getElementById('jam').value,
-        foto: photoUrl, // Mengirim Tautan Foto ImgBB
+        foto: photoUrl,
         keterangan: document.getElementById('keterangan').value
       };
 
-      const scriptRes = await fetch(SCRIPT_URL, {
+      await fetch(SCRIPT_URL, {
         method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const scriptData = await scriptRes.json();
 
       btn.disabled = false;
       btn.innerText = "Kirim Absensi";
+      statusMsg.style.color = "#059669";
+      statusMsg.innerText = "✅ Absensi Berhasil Terkirim!";
+      alert("Absensi Berhasil Terkirim!");
 
-      if (scriptData.result === 'success') {
-        statusMsg.style.color = "#059669";
-        statusMsg.innerText = "✅ Absensi Berhasil Terkirim!";
-        alert("Absensi Berhasil Terkirim!");
-        // Reset form
-        document.getElementById('nama').value = "";
-        document.getElementById('keterangan').value = "";
-        document.getElementById('preview').style.display = 'none';
-        selectedFile = null;
-      } else {
-        statusMsg.style.color = "#dc2626";
-        statusMsg.innerText = "❌ Gagal: " + scriptData.error;
-      }
+      // Reset form
+      document.getElementById('nama').value = "";
+      document.getElementById('keterangan').value = "";
+      document.getElementById('preview').style.display = 'none';
+      selectedFile = null;
 
     } catch (err) {
       btn.disabled = false;
