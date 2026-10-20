@@ -1,33 +1,181 @@
-function doPost(e) {
-  try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    var data = JSON.parse(e.postData.contents);
-    
-    var nama = data.nama;
-    var tipe = data.tipe;
-    var tanggal = data.tanggal;
-    var jam = data.jam;
-    var fotoUrl = data.foto; // URL langsung dari ImgBB
-    var keterangan = data.keterangan;
-    
-    // Tambahkan Baris Baru ke Spreadsheet
-    sheet.appendRow([tanggal, jam, nama, tipe, fotoUrl, keterangan]);
-    
-    // Urutkan Otomatis Berdasarkan Tanggal (Kolom 1) dan Jam (Kolom 2)
-    var lastRow = sheet.getLastRow();
-    if (lastRow > 2) {
-      var range = sheet.getRange(2, 1, lastRow - 1, 6);
-      range.sort([
-        {column: 1, ascending: true},
-        {column: 2, ascending: true}
-      ]);
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Absensi Management Insan Cinta Bakti</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+    .card { max-width: 480px; margin: auto; background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    h2 { text-align: center; color: #1e3a8a; margin-top: 0; }
+    label { font-weight: bold; display: block; margin-top: 14px; margin-bottom: 6px; color: #374151; }
+    select, input[type="text"], textarea {
+      width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; font-size: 14px;
     }
-    
-    return ContentService.createTextOutput(JSON.stringify({ "result": "success", "message": "Absensi berhasil disimpan!" }))
-      .setMimeType(ContentService.MimeType.JSON);
-      
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ "result": "error", "error": error.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
+    input[readonly] { background-color: #e5e7eb; cursor: not-allowed; color: #1f2937; font-weight: bold; }
+    .btn-cam { background: #2563eb; color: white; border: none; padding: 12px; border-radius: 6px; width: 100%; cursor: pointer; font-weight: bold; margin-top: 8px; }
+    .btn-submit { background: #059669; color: white; border: none; padding: 14px; border-radius: 6px; width: 100%; cursor: pointer; font-weight: bold; font-size: 16px; margin-top: 20px; }
+    .btn-submit:hover { background: #047857; }
+    .btn-submit:disabled { background: #9ca3af; cursor: not-allowed; }
+    #preview { width: 100%; height: auto; border-radius: 6px; margin-top: 10px; display: none; }
+    .badge-auto { font-size: 11px; color: #2563eb; font-weight: normal; margin-left: 4px; }
+    #statusMsg { text-align: center; font-weight: bold; margin-top: 15px; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>Absensi Staff</h2>
+  <form id="attendanceForm">
+    <!-- Dropdown Nama -->
+    <label for="nama">Nama Staff:</label>
+    <select id="nama" required>
+      <option value="">-- Pilih Nama --</option>
+      <option value="Erik, S.Ak.">Erik, S.Ak.</option>
+      <option value="Rismawati Simangunsong, A.Md">Rismawati Simangunsong, A.Md</option>
+      <option value="Sri Utami, S.AP.">Sri Utami, S.AP.</option>
+      <option value="Caca, S.M">Caca, S.M</option>
+    </select>
+
+    <!-- Dropdown Tipe Absen -->
+    <label for="tipe">Tipe Absen:</label>
+    <select id="tipe" required>
+      <option value="Masuk">Masuk</option>
+      <option value="Pulang">Pulang</option>
+    </select>
+
+    <!-- Tanggal & Jam Set Otomatis -->
+    <label for="tanggal">Tanggal <span class="badge-auto">(Otomatis)</span>:</label>
+    <input type="text" id="tanggal" readonly>
+
+    <label for="jam">Jam Real-time <span class="badge-auto">(Otomatis)</span>:</label>
+    <input type="text" id="jam" readonly>
+
+    <!-- Foto Langsung Kamera -->
+    <label>Foto Selfie (Langsung Kamera):</label>
+    <input type="file" id="cameraInput" accept="image/*" capture="user" required style="display:none;" onchange="handlePhoto(event)">
+    <button type="button" class="btn-cam" onclick="document.getElementById('cameraInput').click()">📸 Buka Kamera Live</button>
+    <img id="preview" alt="Preview Foto">
+
+    <!-- Keterangan -->
+    <label for="keterangan">Keterangan:</label>
+    <textarea id="keterangan" rows="3" placeholder="Contoh: Hadir Tepat Waktu / Dinas Luar"></textarea>
+
+    <button type="submit" id="btnSubmit" class="btn-submit">Kirim Absensi</button>
+    <div id="statusMsg"></div>
+  </form>
+</div>
+
+<script>
+  // URL Web App Google Apps Script & API Key ImgBB
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyinVnMp6qCYOP3hWm7LZhAQFJyn3-l_wx4Yb2BxgK6szVgRMrfCiMvAXwtz8fXcUk1Ag/exec";
+  const IMGBB_API_KEY = "ef69bd3c08ad95a67f49cc580af88447";
+
+  // Real-time jam & tanggal otomatis
+  function updateClock() {
+    const now = new Date();
+    const tgl = now.toISOString().split('T')[0];
+    const jam = now.toTimeString().split(' ')[0];
+    document.getElementById('tanggal').value = tgl;
+    document.getElementById('jam').value = jam;
   }
-}
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  let selectedFile = null;
+
+  function handlePhoto(event) {
+    const file = event.target.files[0];
+    if (file) {
+      selectedFile = file;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = document.getElementById('preview');
+        img.src = e.target.result;
+        img.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  // Kirim data ke ImgBB lalu ke Google Apps Script
+  document.getElementById('attendanceForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    if (!selectedFile) {
+      alert("Harap ambil foto langsung melalui kamera!");
+      return;
+    }
+
+    const btn = document.getElementById('btnSubmit');
+    const statusMsg = document.getElementById('statusMsg');
+    
+    btn.disabled = true;
+    btn.innerText = "Mengunggah Foto...";
+    statusMsg.style.color = "#2563eb";
+    statusMsg.innerText = "Sedang mengunggah foto ke ImgBB...";
+
+    try {
+      // 1. Upload Foto ke ImgBB secara Real-Time
+      const formData = new FormData();
+      formData.append("image", selectedFile);
+
+      const imgbbRes = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+        method: "POST",
+        body: formData
+      });
+      const imgbbData = await imgbbRes.json();
+
+      if (!imgbbData.success) {
+        throw new Error("Gagal mengunggah foto ke server ImgBB.");
+      }
+
+      const photoUrl = imgbbData.data.url;
+
+      // 2. Kirim Data Absensi & Link Foto ke Google Sheets via Apps Script
+      statusMsg.innerText = "Menyimpan data absensi...";
+      btn.innerText = "Menyimpan...";
+
+      const payload = {
+        nama: document.getElementById('nama').value,
+        tipe: document.getElementById('tipe').value,
+        tanggal: document.getElementById('tanggal').value,
+        jam: document.getElementById('jam').value,
+        foto: photoUrl, // Mengirim Tautan Foto ImgBB
+        keterangan: document.getElementById('keterangan').value
+      };
+
+      const scriptRes = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      const scriptData = await scriptRes.json();
+
+      btn.disabled = false;
+      btn.innerText = "Kirim Absensi";
+
+      if (scriptData.result === 'success') {
+        statusMsg.style.color = "#059669";
+        statusMsg.innerText = "✅ Absensi Berhasil Terkirim!";
+        alert("Absensi Berhasil Terkirim!");
+        // Reset form
+        document.getElementById('nama').value = "";
+        document.getElementById('keterangan').value = "";
+        document.getElementById('preview').style.display = 'none';
+        selectedFile = null;
+      } else {
+        statusMsg.style.color = "#dc2626";
+        statusMsg.innerText = "❌ Gagal: " + scriptData.error;
+      }
+
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerText = "Kirim Absensi";
+      statusMsg.style.color = "#dc2626";
+      statusMsg.innerText = "❌ Terjadi kesalahan: " + err.message;
+      console.error(err);
+    }
+  });
+</script>
+
+</body>
+</html>
